@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "874382266187",
+    "project_id": "app-dev-final-proj",
+    "storage_bucket": "app-dev-final-proj.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:874382266187:android:d1c798352d9277deaa62ce",
+        "android_client_info": {
+          "package_name": "com.tugon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjMbGrZzSb_ja81ILyE-wGJV_ZcLzBebk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
