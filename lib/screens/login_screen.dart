@@ -1,4 +1,3 @@
-// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
@@ -35,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final result = await _authService.signInWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
+      role: UserRole.user,
     );
 
     setState(() => _isLoading = false);
@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleGoogleLogin() async {
     setState(() => _isLoading = true);
 
-    final result = await _authService.signInWithGoogle();
+    final result = await _authService.signInWithGoogle(role: UserRole.user);
 
     setState(() => _isLoading = false);
 
@@ -87,6 +87,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -97,9 +101,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo or App Name
                   Icon(
-                    Icons.lock_outline,
+                    Icons.person,
                     size: 80,
                     color: Theme.of(context).colorScheme.primary,
                   ),
@@ -123,7 +126,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 48),
 
-                  // Email Field
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -147,7 +149,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Password Field
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -179,7 +180,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Login Button
                   FilledButton(
                     onPressed: _isLoading ? null : _handleEmailLogin,
                     style: FilledButton.styleFrom(
@@ -204,7 +204,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Divider
                   Row(
                     children: [
                       Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -220,7 +219,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Google Sign-In Button
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _handleGoogleLogin,
                     icon: Image.asset(
@@ -244,7 +242,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Sign Up Link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

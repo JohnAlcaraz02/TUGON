@@ -1,50 +1,71 @@
-// lib/services/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+enum UserRole { admin, user }
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Get current user
   User? get currentUser => _auth.currentUser;
-
-  // Auth state changes stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  // Sign up with email and password
+  Future<UserRole?> getUserRole(String uid) async {
+    try {
+      final adminDoc = await _firestore.collection('admins').doc(uid).get();
+      if (adminDoc.exists) {
+        return UserRole.admin;
+      }
+
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        return UserRole.user;
+      }
+
+      return null;
+    } catch (e) {
+      print('Error getting user role: $e');
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> signUpWithEmail({
     required String email,
     required String password,
+    required UserRole role,
     String? displayName,
   }) async {
     try {
-      // Create user
+      print('🔐 Starting signup for: $email with role: $role');
+
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // Update display name if provided
-      if (displayName != null && displayName.isNotEmpty) {
-        await userCredential.user?.updateDisplayName(displayName);
-      }
+      print('✅ Firebase Auth user created: ${userCredential.user?.uid}');
+      print('📝 Creating Firestore document...');
 
-      // Store user data in Firestore
-      await _createUserDocument(userCredential.user!);
+      await _createUserDocument(userCredential.user!, role, displayName: displayName);
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      print('✅ Signup complete!');
 
       return {
         'success': true,
         'user': userCredential.user,
+        'role': role,
       };
     } on FirebaseAuthException catch (e) {
+      print('❌ FirebaseAuthException: ${e.code} - ${e.message}');
       return {
         'success': false,
         'message': _getErrorMessage(e.code),
       };
     } catch (e) {
+      print('❌ Unexpected error during signup: $e');
       return {
         'success': false,
         'message': 'An unexpected error occurred. Please try again.',
@@ -52,10 +73,10 @@ class AuthService {
     }
   }
 
-  // Sign in with email and password
   Future<Map<String, dynamic>> signInWithEmail({
     required String email,
     required String password,
+    required UserRole role,
   }) async {
     try {
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
@@ -63,9 +84,32 @@ class AuthService {
         password: password,
       );
 
+      final actualRole = await getUserRole(userCredential.user!.uid);
+
+      if (actualRole == null) {
+        await _auth.signOut();
+        return {
+          'success': false,
+          'message': 'Account not found. Please sign up first.',
+        };
+      }
+
+      if (actualRole != role) {
+        await _auth.signOut();
+        return {
+          'success': false,
+          'message': role == UserRole.admin
+              ? 'This account is not an admin account.'
+              : 'This account is not a user account.',
+        };
+      }
+
+      await _updateLastLogin(userCredential.user!.uid, actualRole);
+
       return {
         'success': true,
         'user': userCredential.user,
+        'role': actualRole,
       };
     } on FirebaseAuthException catch (e) {
       return {
@@ -80,10 +124,8 @@ class AuthService {
     }
   }
 
-  // Sign in with Google
-  Future<Map<String, dynamic>> signInWithGoogle() async {
+  Future<Map<String, dynamic>> signInWithGoogle({required UserRole role}) async {
     try {
-      // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
@@ -93,26 +135,37 @@ class AuthService {
         };
       }
 
-      // Obtain the auth details from the request
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
-      // Create a new credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Sign in to Firebase with the Google credential
       UserCredential userCredential = await _auth.signInWithCredential(credential);
+      final existingRole = await getUserRole(userCredential.user!.uid);
 
-      // Check if this is a new user and create document if needed
-      await _createUserDocument(userCredential.user!);
+      if (existingRole == null) {
+        await _createUserDocument(userCredential.user!, role);
+      } else if (existingRole != role) {
+        await _auth.signOut();
+        await _googleSignIn.signOut();
+        return {
+          'success': false,
+          'message': role == UserRole.admin
+              ? 'This Google account is registered as a user, not an admin.'
+              : 'This Google account is registered as an admin, not a user.',
+        };
+      } else {
+        await _updateLastLogin(userCredential.user!.uid, existingRole);
+      }
 
       return {
         'success': true,
         'user': userCredential.user,
+        'role': role,
       };
     } catch (e) {
+      print('❌ Google Sign-In error: $e');
       return {
         'success': false,
         'message': 'Failed to sign in with Google. Please try again.',
@@ -120,30 +173,60 @@ class AuthService {
     }
   }
 
-  // Create user document in Firestore
-  Future<void> _createUserDocument(User user) async {
-    final userDoc = _firestore.collection('users').doc(user.uid);
-    final docSnapshot = await userDoc.get();
+  Future<void> _createUserDocument(User user, UserRole role, {String? displayName}) async {
+    try {
+      final collection = role == UserRole.admin ? 'admins' : 'users';
+      final userDoc = _firestore.collection(collection).doc(user.uid);
 
-    // Only create if document doesn't exist
-    if (!docSnapshot.exists) {
+      print('📝 Attempting to create document in collection: $collection');
+      print('📝 User ID: ${user.uid}');
+      print('📝 Email: ${user.email}');
+
       await userDoc.set({
         'userId': user.uid,
         'email': user.email,
-        'displayName': user.displayName ?? '',
+        'displayName': displayName ?? '',
         'photoURL': user.photoURL ?? '',
+        'role': role.toString(),
         'createdAt': FieldValue.serverTimestamp(),
         'lastLogin': FieldValue.serverTimestamp(),
       });
-    } else {
-      // Update last login time
-      await userDoc.update({
-        'lastLogin': FieldValue.serverTimestamp(),
-      });
+
+      print('✅ Successfully created user document in Firestore!');
+    } catch (e) {
+      print('❌ Error creating user document: $e');
+      rethrow;
     }
   }
 
-  // Sign out
+  Future<void> _updateLastLogin(String uid, UserRole role) async {
+    final collection = role == UserRole.admin ? 'admins' : 'users';
+    await _firestore.collection(collection).doc(uid).update({
+      'lastLogin': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<Map<String, dynamic>?> getUserData(String uid) async {
+    try {
+      final role = await getUserRole(uid);
+      if (role == null) return null;
+
+      final collection = role == UserRole.admin ? 'admins' : 'users';
+      final doc = await _firestore.collection(collection).doc(uid).get();
+
+      if (doc.exists) {
+        return {
+          ...doc.data()!,
+          'role': role,
+        };
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user data: $e');
+      return null;
+    }
+  }
+
   Future<void> signOut() async {
     await Future.wait([
       _auth.signOut(),
@@ -151,7 +234,6 @@ class AuthService {
     ]);
   }
 
-  // Password reset
   Future<Map<String, dynamic>> resetPassword(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
@@ -167,7 +249,6 @@ class AuthService {
     }
   }
 
-  // Get user-friendly error messages
   String _getErrorMessage(String code) {
     switch (code) {
       case 'weak-password':

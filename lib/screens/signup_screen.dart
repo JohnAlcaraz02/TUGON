@@ -1,4 +1,3 @@
-// lib/screens/signup_screen.dart
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'main_navigation.dart';
@@ -39,6 +38,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final result = await _authService.signUpWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
+      role: UserRole.user,
       displayName: _displayNameController.text.trim(),
     );
 
@@ -58,7 +58,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _handleGoogleSignup() async {
     setState(() => _isLoading = true);
 
-    final result = await _authService.signInWithGoogle();
+    final result = await _authService.signInWithGoogle(role: UserRole.user);
 
     setState(() => _isLoading = false);
 
@@ -102,7 +102,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo or App Name
                   Icon(
                     Icons.person_add_outlined,
                     size: 80,
@@ -128,7 +127,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 48),
 
-                  // Display Name Field
                   TextFormField(
                     controller: _displayNameController,
                     decoration: InputDecoration(
@@ -142,7 +140,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Email Field
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -166,7 +163,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Password Field
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -198,7 +194,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Confirm Password Field
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: _obscureConfirmPassword,
@@ -230,7 +225,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Sign Up Button
                   FilledButton(
                     onPressed: _isLoading ? null : _handleSignup,
                     style: FilledButton.styleFrom(
@@ -255,7 +249,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Divider
                   Row(
                     children: [
                       Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -271,7 +264,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Google Sign-Up Button
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _handleGoogleSignup,
                     icon: Image.asset(
@@ -295,7 +287,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Login Link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
